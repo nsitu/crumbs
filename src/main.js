@@ -1,37 +1,97 @@
 import AFRAME from 'aframe';
-// import 'aframe-meshline-component'
-// AFRAME.registerComponent("path-tracker", {
-//   init() {
-//     this.positions = [];
-//     this.line = document.createElement("a-entity");
-//     this.el.sceneEl.appendChild(this.line);
 
-//     this.el.sceneEl.addEventListener("enter-vr", () => {
-//       this.tick = AFRAME.utils.throttleTick(this.track, 200, this);
-//     });
-//   },
+// Simple breadcrumb trail component
+AFRAME.registerComponent('breadcrumb-trail', {
+  schema: {
+    interval: { type: 'number', default: 500 }, // milliseconds between breadcrumbs
+    minDistance: { type: 'number', default: 0.5 }, // minimum distance to move before dropping a breadcrumb
+    breadcrumbSize: { type: 'number', default: 0.1 },
+    trailColor: { type: 'color', default: '#ff6b6b' }
+  },
 
-//   track() {
-//     const cam = this.el.sceneEl.camera.el;
-//     const pos = cam.object3D.position.clone();
+  init: function () {
+    this.breadcrumbs = [];
+    this.lastPosition = new THREE.Vector3();
+    this.lastTime = 0;
+    
+    // Get the camera (user's head position)
+    this.camera = this.el.sceneEl.camera;
+    
+    console.log('Breadcrumb trail initialized');
+  },
 
-//     if (
-//       this.positions.length === 0 ||
-//       !pos.equals(this.positions[this.positions.length - 1])
-//     ) {
-//       this.positions.push(pos.clone());
+  tick: function (time) {
+    // Only drop breadcrumbs at specified intervals
+    if (time - this.lastTime < this.data.interval) {
+      return;
+    }
 
-//       if (this.positions.length >= 2) {
-//         const points = this.positions
-//           .map((p) => `${p.x} ${p.y} ${p.z}`)
-//           .join(", ");
+    if (!this.camera) {
+      this.camera = this.el.sceneEl.camera;
+      return;
+    }
 
-//         this.line.setAttribute("meshline", {
-//           lineWidth: 5,
-//           path: points,
-//           color: "red",
-//         });
-//       }
-//     }
-//   },
-// });
+    // Get current camera position
+    const currentPosition = new THREE.Vector3();
+    this.camera.getWorldPosition(currentPosition);
+
+    // Check if we've moved far enough to drop a new breadcrumb
+    const distance = currentPosition.distanceTo(this.lastPosition);
+    
+    if (distance >= this.data.minDistance) {
+      this.dropBreadcrumb(currentPosition);
+      this.lastPosition.copy(currentPosition);
+      this.lastTime = time;
+    }
+  },
+
+  dropBreadcrumb: function (position) {
+    // Create a small sphere as a breadcrumb
+    const breadcrumb = document.createElement('a-sphere');
+    breadcrumb.setAttribute('radius', this.data.breadcrumbSize);
+    breadcrumb.setAttribute('color', this.data.trailColor);
+    breadcrumb.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
+    
+    // Add some glow effect
+    breadcrumb.setAttribute('material', {
+      color: this.data.trailColor,
+      emissive: this.data.trailColor,
+      emissiveIntensity: 0.3
+    });
+
+    this.el.sceneEl.appendChild(breadcrumb);
+    this.breadcrumbs.push(breadcrumb);
+
+    // Connect to previous breadcrumb with a line
+    if (this.breadcrumbs.length > 1) {
+      const previousBreadcrumb = this.breadcrumbs[this.breadcrumbs.length - 2];
+      const previousPos = previousBreadcrumb.getAttribute('position');
+      
+      const line = document.createElement('a-entity');
+      line.setAttribute('line', {
+        start: `${previousPos.x} ${previousPos.y} ${previousPos.z}`,
+        end: `${position.x} ${position.y} ${position.z}`,
+        color: this.data.trailColor,
+        opacity: 0.7
+      });
+      
+      this.el.sceneEl.appendChild(line);
+    }
+
+    console.log(`Dropped breadcrumb at ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`);
+  }
+});
+
+// Initialize the scene
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('A-Frame loaded, setting up breadcrumb trail');
+  
+  // Wait for the scene to be ready
+  const scene = document.querySelector('a-scene');
+  if (scene) {
+    scene.addEventListener('loaded', function () {
+      console.log('Scene loaded, adding breadcrumb trail component');
+      scene.setAttribute('breadcrumb-trail', '');
+    });
+  }
+}); 

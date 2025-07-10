@@ -3,9 +3,9 @@ import AFRAME from 'aframe';
 // Simple breadcrumb trail component
 AFRAME.registerComponent('breadcrumb-trail', {
   schema: {
-    interval: { type: 'number', default: 500 }, // milliseconds between breadcrumbs
-    minDistance: { type: 'number', default: 0.5 }, // minimum distance to move before dropping a breadcrumb
-    breadcrumbSize: { type: 'number', default: 0.1 },
+    interval: { type: 'number', default: 200 }, // milliseconds between breadcrumbs (more frequent for mobile)
+    minDistance: { type: 'number', default: 0.1 }, // smaller distance for mobile movement
+    breadcrumbSize: { type: 'number', default: 0.05 },
     trailColor: { type: 'color', default: '#ff6b6b' }
   },
 
@@ -13,11 +13,12 @@ AFRAME.registerComponent('breadcrumb-trail', {
     this.breadcrumbs = [];
     this.lastPosition = new THREE.Vector3();
     this.lastTime = 0;
-    
-    // Get the camera (user's head position)
+
+    // Get the camera rig (for VR) or camera (for desktop)
+    this.cameraRig = this.el.sceneEl.querySelector('#cameraRig') || this.el.sceneEl.querySelector('[camera]');
     this.camera = this.el.sceneEl.camera;
-    
-    console.log('Breadcrumb trail initialized');
+
+    console.log('Breadcrumb trail initialized for mobile/VR movement');
   },
 
   tick: function (time) {
@@ -31,13 +32,19 @@ AFRAME.registerComponent('breadcrumb-trail', {
       return;
     }
 
-    // Get current camera position
+    // Get current position - either from camera rig (VR) or camera (desktop)
     const currentPosition = new THREE.Vector3();
-    this.camera.getWorldPosition(currentPosition);
+
+    // For VR/mobile, we want to track the rig position which includes room-scale movement
+    if (this.cameraRig && this.cameraRig !== this.camera.el) {
+      this.cameraRig.object3D.getWorldPosition(currentPosition);
+    } else {
+      this.camera.getWorldPosition(currentPosition);
+    }
 
     // Check if we've moved far enough to drop a new breadcrumb
     const distance = currentPosition.distanceTo(this.lastPosition);
-    
+
     if (distance >= this.data.minDistance) {
       this.dropBreadcrumb(currentPosition);
       this.lastPosition.copy(currentPosition);
@@ -51,7 +58,7 @@ AFRAME.registerComponent('breadcrumb-trail', {
     breadcrumb.setAttribute('radius', this.data.breadcrumbSize);
     breadcrumb.setAttribute('color', this.data.trailColor);
     breadcrumb.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
-    
+
     // Add some glow effect
     breadcrumb.setAttribute('material', {
       color: this.data.trailColor,
@@ -66,7 +73,7 @@ AFRAME.registerComponent('breadcrumb-trail', {
     if (this.breadcrumbs.length > 1) {
       const previousBreadcrumb = this.breadcrumbs[this.breadcrumbs.length - 2];
       const previousPos = previousBreadcrumb.getAttribute('position');
-      
+
       const line = document.createElement('a-entity');
       line.setAttribute('line', {
         start: `${previousPos.x} ${previousPos.y} ${previousPos.z}`,
@@ -74,7 +81,7 @@ AFRAME.registerComponent('breadcrumb-trail', {
         color: this.data.trailColor,
         opacity: 0.7
       });
-      
+
       this.el.sceneEl.appendChild(line);
     }
 
@@ -85,7 +92,7 @@ AFRAME.registerComponent('breadcrumb-trail', {
 // Initialize the scene
 document.addEventListener('DOMContentLoaded', function () {
   console.log('A-Frame loaded, setting up breadcrumb trail');
-  
+
   // Wait for the scene to be ready
   const scene = document.querySelector('a-scene');
   if (scene) {

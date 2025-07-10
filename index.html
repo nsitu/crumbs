@@ -17,23 +17,18 @@
 </head>
 
 <body>
-    <a-scene
-        vr-mode-ui="enabled: true"
+    <a-scene 
+        vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: true"
         background="color: #ECECEC"
-        embedded
     >
-        <!-- Camera rig for VR movement tracking -->
-        <a-entity
-            id="cameraRig"
-            movement-controls="fly: false; constrainToNavMesh: false"
-            position="0 1.6 3"
-        >
-            <a-camera
-                look-controls="pointerLockEnabled: true"
-                wasd-controls="acceleration: 20"
-                cursor="rayOrigin: mouse"
-            >
+        <!-- Camera with mobile-friendly controls -->
+        <a-entity id="cameraRig" 
+                  position="0 1.6 3">
+            <a-camera 
+                look-controls="pointerLockEnabled: false; touchEnabled: true; magicWindowTrackingEnabled: true"
+                wasd-controls="enabled: true; acceleration: 15"
+                cursor="rayOrigin: mouse">
             </a-camera>
         </a-entity>
 
@@ -71,6 +66,18 @@
             color="#7BC8A4"
             material="opacity: 0.8"
         ></a-plane>
+        
+        <!-- Touch controls for mobile -->
+        <a-entity id="touch-controls" 
+                  position="0 0 0"
+                  geometry="primitive: plane; width: 2; height: 1"
+                  material="color: #333; opacity: 0.8"
+                  text="value: Drag to move\nTap+drag to look around; 
+                        align: center; 
+                        color: white; 
+                        width: 6"
+                  visible="false">
+        </a-entity>
 
     </a-scene>
 

@@ -89,6 +89,55 @@ AFRAME.registerComponent('breadcrumb-trail', {
   }
 });
 
+// Touch movement component for mobile
+AFRAME.registerComponent('touch-movement', {
+  init: function () {
+    this.isDragging = false;
+    this.lastTouch = { x: 0, y: 0 };
+    
+    // Bind touch events
+    this.el.sceneEl.addEventListener('touchstart', this.onTouchStart.bind(this));
+    this.el.sceneEl.addEventListener('touchmove', this.onTouchMove.bind(this));
+    this.el.sceneEl.addEventListener('touchend', this.onTouchEnd.bind(this));
+  },
+
+  onTouchStart: function (event) {
+    if (event.touches.length === 1) {
+      this.isDragging = true;
+      this.lastTouch.x = event.touches[0].clientX;
+      this.lastTouch.y = event.touches[0].clientY;
+    }
+  },
+
+  onTouchMove: function (event) {
+    if (!this.isDragging || event.touches.length !== 1) return;
+    
+    event.preventDefault();
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - this.lastTouch.x;
+    const deltaY = touch.clientY - this.lastTouch.y;
+    
+    // Move the camera rig based on touch movement
+    const cameraRig = this.el;
+    const currentPosition = cameraRig.getAttribute('position');
+    
+    // Convert screen movement to world movement
+    const moveSpeed = 0.01;
+    cameraRig.setAttribute('position', {
+      x: currentPosition.x + deltaX * moveSpeed,
+      y: currentPosition.y,
+      z: currentPosition.z + deltaY * moveSpeed
+    });
+    
+    this.lastTouch.x = touch.clientX;
+    this.lastTouch.y = touch.clientY;
+  },
+
+  onTouchEnd: function () {
+    this.isDragging = false;
+  }
+});
+
 // Initialize the scene
 document.addEventListener('DOMContentLoaded', function () {
   console.log('A-Frame loaded, setting up breadcrumb trail');
@@ -99,6 +148,22 @@ document.addEventListener('DOMContentLoaded', function () {
     scene.addEventListener('loaded', function () {
       console.log('Scene loaded, adding breadcrumb trail component');
       scene.setAttribute('breadcrumb-trail', '');
+      
+      // Add touch movement to camera rig
+      const cameraRig = document.querySelector('#cameraRig');
+      if (cameraRig) {
+        cameraRig.setAttribute('touch-movement', '');
+        console.log('Touch movement added to camera rig');
+      }
+      
+      // Show mobile instructions if on mobile
+      if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        const instructions = document.querySelector('#touch-controls');
+        if (instructions) {
+          instructions.setAttribute('visible', true);
+          instructions.setAttribute('position', '0 2 -3');
+        }
+      }
     });
   }
 }); 

@@ -21,14 +21,16 @@
         vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: true"
         background="color: #ECECEC"
+        webxr="requiredFeatures: local-floor; optionalFeatures: bounded-floor"
     >
-        <!-- Camera with mobile-friendly controls -->
+        <!-- Camera with room-scale tracking -->
         <a-entity id="cameraRig" 
-                  position="0 1.6 3">
+                  position="0 0 0"
+                  webxr-camera-rig>
             <a-camera 
                 look-controls="pointerLockEnabled: false; touchEnabled: true; magicWindowTrackingEnabled: true"
                 wasd-controls="enabled: true; acceleration: 15"
-                cursor="rayOrigin: mouse">
+                position="0 1.6 0">
             </a-camera>
         </a-entity>
 
@@ -69,17 +71,39 @@
         
         <!-- Touch controls for mobile -->
         <a-entity id="touch-controls" 
-                  position="0 0 0"
-                  geometry="primitive: plane; width: 2; height: 1"
+                  position="0 2 -3"
+                  geometry="primitive: plane; width: 3; height: 1.5"
                   material="color: #333; opacity: 0.8"
-                  text="value: Drag to move\nTap+drag to look around; 
+                  text="value: Tap to enable room tracking\nMove around physically to see trail; 
                         align: center; 
                         color: white; 
                         width: 6"
-                  visible="false">
+                  class="clickable">
         </a-entity>
 
     </a-scene>
+
+    <!-- Room tracking activation button -->
+    <div id="tracking-ui" style="position: absolute; top: 20px; left: 20px; z-index: 100;">
+        <button id="enable-tracking" style="
+            background: #ff6b6b; 
+            color: white; 
+            border: none; 
+            padding: 15px 20px; 
+            border-radius: 5px; 
+            font-size: 16px;
+            cursor: pointer;">
+            Enable Room Tracking
+        </button>
+        <div id="tracking-status" style="
+            background: rgba(0,0,0,0.8); 
+            color: white; 
+            padding: 10px; 
+            margin-top: 10px; 
+            border-radius: 5px;
+            display: none;">
+        </div>
+    </div>
 
 
     <script

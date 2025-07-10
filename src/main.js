@@ -89,112 +89,83 @@ AFRAME.registerComponent('breadcrumb-trail', {
   }
 });
 
-// WebXR Room Tracking Component
+// WebXR Room Tracking Component with Motion Estimation
 AFRAME.registerComponent('webxr-camera-rig', {
   init: function () {
-    this.el.sceneEl.addEventListener('enter-vr', this.onEnterXR.bind(this));
-    this.el.sceneEl.addEventListener('exit-vr', this.onExitXR.bind(this));
+    this.velocity = { x: 0, y: 0, z: 0 };
+    this.position = { x: 0, y: 0, z: 0 };
+    this.lastTime = Date.now();
+    this.isTracking = false;
     
-    // Try to start room tracking immediately for inline mode
-    this.setupRoomTracking();
+    console.log('Motion tracking component initialized');
   },
 
-  setupRoomTracking: function () {
-    console.log('Setting up room tracking...');
+  startMotionTracking: function () {
+    if (this.isTracking) return;
     
-    // Check if WebXR is supported
-    if (navigator.xr) {
-      navigator.xr.isSessionSupported('inline').then((supported) => {
-        if (supported) {
-          console.log('WebXR inline mode supported');
-          this.startInlineSession();
-        } else {
-          console.log('WebXR inline mode not supported, falling back to device orientation');
-          this.fallbackToDeviceOrientation();
-        }
-      }).catch((err) => {
-        console.log('WebXR check failed, using fallback:', err);
-        this.fallbackToDeviceOrientation();
-      });
-    } else {
-      console.log('WebXR not available, using device orientation');
-      this.fallbackToDeviceOrientation();
-    }
+    console.log('Starting motion tracking...');
+    this.isTracking = true;
+    
+    // Listen for device motion events
+    window.addEventListener('devicemotion', this.onDeviceMotion.bind(this));
+    
+    // Update position every frame
+    this.el.sceneEl.addEventListener('tick', this.updatePosition.bind(this));
   },
 
-  startInlineSession: function () {
-    navigator.xr.requestSession('inline', {
-      requiredFeatures: [],
-      optionalFeatures: ['local-floor', 'bounded-floor']
-    }).then((session) => {
-      console.log('WebXR inline session started');
-      this.xrSession = session;
+  onDeviceMotion: function (event) {
+    if (!event.acceleration) return;
+    
+    const currentTime = Date.now();
+    const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+    this.lastTime = currentTime;
+    
+    // Filter out small accelerations (noise/gravity)
+    const threshold = 1.0;
+    const acc = event.acceleration;
+    
+    if (Math.abs(acc.x) > threshold || Math.abs(acc.z) > threshold) {
+      // Integrate acceleration to get velocity (very basic)
+      const sensitivity = 0.1;
+      this.velocity.x += (acc.x || 0) * deltaTime * sensitivity;
+      this.velocity.z += (acc.z || 0) * deltaTime * sensitivity;
       
-      // Set up reference space for room tracking
-      session.requestReferenceSpace('local-floor').then((referenceSpace) => {
-        this.referenceSpace = referenceSpace;
-        console.log('Room-scale tracking enabled!');
-      }).catch(() => {
-        // Fallback to viewer reference space
-        session.requestReferenceSpace('viewer').then((referenceSpace) => {
-          this.referenceSpace = referenceSpace;
-          console.log('Basic tracking enabled');
-        });
-      });
+      // Apply damping to prevent drift
+      this.velocity.x *= 0.95;
+      this.velocity.z *= 0.95;
       
-    }).catch((err) => {
-      console.log('Failed to start WebXR session:', err);
-      this.fallbackToDeviceOrientation();
-    });
-  },
-
-  fallbackToDeviceOrientation: function () {
-    console.log('Using device orientation for movement tracking');
-    
-    // Request device motion permissions for iOS
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then((response) => {
-        if (response === 'granted') {
-          this.enableDeviceOrientation();
-        }
-      });
-    } else {
-      this.enableDeviceOrientation();
-    }
-  },
-
-  enableDeviceOrientation: function () {
-    // Listen for device motion for position changes
-    window.addEventListener('devicemotion', (event) => {
-      if (event.acceleration) {
-        // Simple integration of acceleration to estimate position change
-        // This is basic but will give some movement tracking
-        this.updatePositionFromMotion(event.acceleration);
+      console.log(`Motion detected: acc(${acc.x?.toFixed(2)}, ${acc.z?.toFixed(2)}) vel(${this.velocity.x.toFixed(2)}, ${this.velocity.z.toFixed(2)})`);
+      
+      // Update debug display
+      const debugDiv = document.getElementById('debug-info');
+      if (debugDiv) {
+        debugDiv.innerHTML = `Acc: X=${acc.x?.toFixed(1)} Z=${acc.z?.toFixed(1)}<br>Vel: X=${this.velocity.x.toFixed(2)} Z=${this.velocity.z.toFixed(2)}<br>Pos: X=${this.position.x.toFixed(2)} Z=${this.position.z.toFixed(2)}`;
       }
-    });
-  },
-
-  updatePositionFromMotion: function (acceleration) {
-    // Very basic position estimation from acceleration
-    // In a real app, you'd want more sophisticated tracking
-    const sensitivity = 0.001;
-    const currentPos = this.el.getAttribute('position');
-    
-    if (Math.abs(acceleration.x) > 2 || Math.abs(acceleration.y) > 2 || Math.abs(acceleration.z) > 2) {
-      this.el.setAttribute('position', {
-        x: currentPos.x + (acceleration.x || 0) * sensitivity,
-        y: currentPos.y,
-        z: currentPos.z + (acceleration.z || 0) * sensitivity
-      });
     }
   },
 
-  onEnterXR: function () {
-    console.log('Entered XR mode');
+  updatePosition: function () {
+    if (!this.isTracking) return;
+    
+    // Integrate velocity to get position
+    this.position.x += this.velocity.x;
+    this.position.z += this.velocity.z;
+    
+    // Update the camera rig position
+    const currentPos = this.el.getAttribute('position');
+    this.el.setAttribute('position', {
+      x: this.position.x,
+      y: currentPos.y, // Keep Y position stable
+      z: this.position.z
+    });
   },
 
-  onExitXR: function () {
-    console.log('Exited XR mode');
+  // Add a manual reset function
+  resetPosition: function () {
+    this.position = { x: 0, y: 0, z: 0 };
+    this.velocity = { x: 0, y: 0, z: 0 };
+    this.el.setAttribute('position', '0 0 0');
+    console.log('Position reset');
   }
 });
 
@@ -253,11 +224,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Set up room tracking button
   const enableButton = document.getElementById('enable-tracking');
+  const resetButton = document.getElementById('reset-position');
   const statusDiv = document.getElementById('tracking-status');
+  const debugDiv = document.getElementById('debug-info');
   
   if (enableButton) {
     enableButton.addEventListener('click', function() {
       requestRoomTracking();
+    });
+  }
+  
+  if (resetButton) {
+    resetButton.addEventListener('click', function() {
+      const cameraRig = document.querySelector('#cameraRig');
+      if (cameraRig && cameraRig.components['webxr-camera-rig']) {
+        cameraRig.components['webxr-camera-rig'].resetPosition();
+        statusDiv.textContent = 'Position reset! Walk around to see new trail.';
+      }
     });
   }
 
@@ -265,28 +248,32 @@ document.addEventListener('DOMContentLoaded', function () {
     statusDiv.style.display = 'block';
     statusDiv.textContent = 'Requesting permissions...';
     
-    // Request device orientation permission for iOS
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then((response) => {
+    const cameraRig = document.querySelector('#cameraRig');
+    
+    // Request device motion permission for iOS
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission().then((response) => {
         if (response === 'granted') {
-          statusDiv.textContent = 'Device orientation enabled! Walk around to see trail.';
+          statusDiv.textContent = 'Motion tracking enabled! Walk around to see trail.';
           enableButton.style.display = 'none';
+          resetButton.style.display = 'inline-block';
+          debugDiv.style.display = 'block';
+          if (cameraRig && cameraRig.components['webxr-camera-rig']) {
+            cameraRig.components['webxr-camera-rig'].startMotionTracking();
+          }
         } else {
           statusDiv.textContent = 'Permission denied. Try touch controls instead.';
         }
       });
     } else {
-      statusDiv.textContent = 'Room tracking enabled! Walk around to see trail.';
+      // For Android, start motion tracking directly
+      statusDiv.textContent = 'Motion tracking enabled! Walk around to see trail.';
       enableButton.style.display = 'none';
-    }
-    
-    // Also request device motion permission
-    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-      DeviceMotionEvent.requestPermission().then((response) => {
-        if (response === 'granted') {
-          statusDiv.textContent = 'Full motion tracking enabled! Walk around physically.';
-        }
-      });
+      resetButton.style.display = 'inline-block';
+      debugDiv.style.display = 'block';
+      if (cameraRig && cameraRig.components['webxr-camera-rig']) {
+        cameraRig.components['webxr-camera-rig'].startMotionTracking();
+      }
     }
   }
 

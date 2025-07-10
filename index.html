@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link
+        rel="icon"
+        type="image/svg+xml"
+        href="/draw.svg"
+    />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+    <title>A‑Frame Path Tracer</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+
+
+</head>
+
+<body>
+    <a-scene
+        embedded
+        xr-mode-ui="enabled: true"
+        webxr="optionalFeatures: hit-test"
+        renderer="colorManagement: true; toneMapping: no;"
+        path-tracker
+    >
+        <a-camera></a-camera>
+    </a-scene>
+
+    <script>
+        AFRAME.registerComponent("path-tracker", {
+            init() {
+                this.positions = [];
+                this.line = null;
+
+                this.el.sceneEl.addEventListener("enter-vr", () => {
+                    // Create a line entity
+                    this.line = document.createElement("a-entity");
+                    this.line.setAttribute("line", {
+                        start: "0 0 0",
+                        end: "0 0 0",
+                        color: "red",
+                    });
+                    this.el.sceneEl.appendChild(this.line);
+
+                    // Start tracking
+                    this.tick = AFRAME.utils.throttleTick(this.track, 200, this);
+                });
+            },
+
+            track() {
+                const cam = this.el.sceneEl.camera.el;
+                const pos = cam.object3D.position.clone();
+
+                // Only add if moved
+                if (
+                    this.positions.length === 0 ||
+                    !pos.equals(this.positions[this.positions.length - 1])
+                ) {
+                    this.positions.push(pos.clone());
+
+                    if (this.positions.length > 1) {
+                        const points = this.positions
+                            .map((p) => `${p.x} ${p.y} ${p.z}`)
+                            .join(", ");
+                        if (!this.polyline) {
+                            this.polyline = document.createElement("a-entity");
+                            this.polyline.setAttribute("meshline", {
+                                lineWidth: 5,
+                                path: points,
+                                color: "red",
+                            });
+                            this.el.sceneEl.appendChild(this.polyline);
+                        } else {
+                            this.polyline.setAttribute("meshline", "path", points);
+                        }
+                    }
+                }
+            },
+        });
+
+        // meshline component
+        AFRAME.registerComponent("meshline", {
+            schema: {
+                path: { type: "string" },
+                color: { default: "red" },
+                lineWidth: { default: 2 },
+            },
+
+            update() {
+                if (!this.mesh) {
+                    const material = new THREE.MeshBasicMaterial({
+                        color: this.data.color,
+                    });
+                    const geometry = new THREE.TubeGeometry(
+                        new THREE.CatmullRomCurve3([]),
+                        100,
+                        this.data.lineWidth * 0.01,
+                        8,
+                        false
+                    );
+                    this.mesh = new THREE.Mesh(geometry, material);
+                    this.el.setObject3D("mesh", this.mesh);
+                }
+
+                const points = this.data.path.split(",").map((str) => {
+                    const [x, y, z] = str.trim().split(" ").map(Number);
+                    return new THREE.Vector3(x, y, z);
+                });
+
+                if (points.length >= 2) {
+                    const curve = new THREE.CatmullRomCurve3(points);
+                    this.mesh.geometry.dispose();
+                    this.mesh.geometry = new THREE.TubeGeometry(
+                        curve,
+                        Math.max(points.length * 2, 50),
+                        this.data.lineWidth * 0.01,
+                        8,
+                        false
+                    );
+                }
+            },
+        });
+    </script>
+
+    <!--     
+    <a-scene
+        embedded
+        xr-mode-ui="enabled: true"
+        webxr="optionalFeatures: hit-test"
+        renderer="colorManagement: true; physicallyCorrectLights"
+        path-tracker
+    >
+        <a-camera></a-camera>
+    </a-scene>
+
+
+    <script
+        type="module"
+        src="/src/main.js"
+    ></script> -->
+</body>
+
+</html>

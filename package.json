@@ -1,0 +1,29 @@
+{
+  "name": "crumbs",
+  "version": "1.0.0",
+  "description": "Breacrumbs, actually, or a trail of points that you walked through in AR.",
+  "homepage": "https://github.com/nsitu/crumbs#readme",
+  "bugs": {
+    "url": "https://github.com/nsitu/crumbs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nsitu/crumbs.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.0.3"
+  },
+  "dependencies": {
+    "aframe": "^1.7.1",
+    "aframe-meshline-component": "^0.4.1"
+  }
+}
